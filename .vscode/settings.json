@@ -1,0 +1,20 @@
+{
+	"files.exclude": {
+		"**/.git": true,
+		"**/.svn": true,
+		"**/.hg": true,
+		"**/CVS": true,
+		"**/.DS_Store": true,
+		"**/*.o": true,
+		"**/*.exe": true,
+	},
+	"files.associations": {
+		"array": "cpp",
+		"string": "cpp",
+		"string_view": "cpp",
+		"*.m": "cpp",
+		"ostream": "cpp",
+		"iostream": "cpp"
+	},
+	"C_Cpp.errorSquiggles": "Disabled"
+}
