@@ -1,8 +1,13 @@
-#include <raylib.h>
+#include "raylib.h"
 #include <iostream>
 #include <string>
+#include <vector>
+#include <ctime>
 
 using namespace std;
+
+const int WIDTH{480};
+const int HEIGHT{600};
 
 class Bird
 {
@@ -16,23 +21,49 @@ public:
 class Pipa
 {
 public:
-    Rectangle rect;
-    int pos; // 1 = pipa atas, 2 = pipa bawah
+    float x;
+    float width;
+    float gapY;
+    float gapSize;
 };
+
+void SpawnPipe(std::vector<Pipa> &pipes, float pipeGap, float pipeWidth)
+{
+    float gapY = GetRandomValue(0, 10000) / 10000.0f * (HEIGHT - 200) + 100;
+
+    Pipa p;
+    p.x = WIDTH;
+    p.gapY = gapY;
+    p.gapSize = pipeGap;
+    p.width = pipeWidth;
+
+    pipes.push_back(p);
+}
+
+bool IsCollide(float bx, float by, float bwidth, float bheight, float px, float py, float pwidth, float pheight)
+{
+    if (bx < px + pwidth && bx + bwidth > px && by < py + pheight && by + bheight > py)
+    {
+        return true;
+    }
+    return false;
+}
 
 int main()
 {
 
-    const int WIDTH{480};
-    const int HEIGHT{600};
     InitAudioDevice();
     InitWindow(WIDTH, HEIGHT, "Flappy pepeg");
     SetTargetFPS(60);
+
+    srand(std::time(NULL));
 
     int score = 0;
     bool getScore{};
     bool gameOver{};
     int countdown{3};
+    int spawnCount{2};
+    float lastSpawn = GetTime();
     float runTimes{};
     float lastUpdate{1.0};
     bool startCountdown{};
@@ -44,33 +75,11 @@ int main()
     bird.rect.y = HEIGHT / 2;
     Sound coinSFX = LoadSound("flap.mp3");
 
-    int randInt = GetRandomValue(0, 4);
-    int randomPipaPos[5][2] = {
-        {-300, 350},
-        {-400, 250},
-        {-200, 450},
-        {-450, 150},
-        {-50, 550},
-    };
+    int pipeWidth = 40;
+    int pipeGap = 120;
+    int pipeSpeed = 2;
 
-    Pipa top;
-    top.rect.x = WIDTH;
-    top.rect.y = randomPipaPos[randInt][0];
-    top.rect.width = 40;
-    top.rect.height = 500;
-    top.pos = 1;
-
-    Pipa bottom;
-    bottom.rect.x = WIDTH;
-    bottom.rect.y = randomPipaPos[randInt][1];
-    bottom.rect.width = 40;
-    bottom.rect.height = 500;
-    bottom.pos = 2;
-
-    int pipaLength{2};
-    Pipa pipas[pipaLength]{
-        top,
-        bottom};
+    std::vector<Pipa> pipas;
 
     while (!WindowShouldClose())
     {
@@ -95,42 +104,46 @@ int main()
             bird.velocity += bird.gravity;
             bird.rect.y += bird.velocity;
 
-            randInt = GetRandomValue(0, 4);
-            for (int i = 0; i < pipaLength; i++)
+            // check collision to pipe
+            for (int i = 0; i < pipas.size(); i++)
             {
-                pipas[i].rect.x -= 2;
-                if (pipas[i].rect.x < -50)
+                // check pipa atas
+                if (IsCollide(bird.rect.x, bird.rect.y, bird.rect.width, bird.rect.height, pipas[i].x, 0, pipas[i].width, pipas[i].gapY))
                 {
-                    getScore = false;
+                    gameOver = true;
+                }
 
-                    pipas[i].rect.x = WIDTH;
-
-                    if (pipas[i].pos == 1)
-                        pipas[i].rect.y = randomPipaPos[randInt][0];
-
-                    if (pipas[i].pos == 2)
-                        pipas[i].rect.y = randomPipaPos[randInt][1];
-                };
+                // check pipa bawah
+                if (IsCollide(bird.rect.x, bird.rect.y, bird.rect.width, bird.rect.height, pipas[i].x, pipas[i].gapY + pipas[i].gapSize, pipas[i].width, HEIGHT - pipas[i].gapY + pipas[i].gapSize))
+                {
+                    gameOver = true;
+                }
             }
-        }
 
-        // check player collision with pipa
-        for (int i = 0; i < pipaLength; i++)
-        {
-            if (CheckCollisionRecs(bird.rect, pipas[i].rect))
+            // move the pipa to the left
+            for (int i = 0; i < pipas.size(); i++)
             {
-                gameOver = true;
+                pipas[i].x -= pipeSpeed;
             }
-        }
 
-        // player get score
-        for (int i = 0; i < pipaLength; i++)
-        {
-            if (bird.rect.x > pipas[i].rect.x + pipas[i].rect.width && !getScore)
+            // bird melewati pipa
+            for (int i = 0; i < pipas.size(); i++)
             {
-                PlaySound(coinSFX);
-                score += 1;
-                getScore = true;
+                if (bird.rect.x > pipas[i].x + pipas[i].width && !getScore)
+                {
+                    PlaySound(coinSFX);
+                    score += 1;
+                    getScore = true;
+                }
+            }
+
+            // check jika pipa sudah keluar dari screen
+            for (int i = 0; i < pipas.size(); i++)
+            {
+                if (pipas[i].x < -pipas[i].width)
+                {
+                    pipas.erase(pipas.begin() + i);
+                }
             }
         }
 
@@ -143,11 +156,7 @@ int main()
             bird.rect.x = 50;
             bird.rect.y = HEIGHT / 2;
             countdown = 3;
-
-            for (int i = 0; i < pipaLength; i++)
-            {
-                pipas[i].rect.x = WIDTH;
-            }
+            pipas.clear();
         }
 
         if (startCountdown)
@@ -171,6 +180,11 @@ int main()
             else
             {
                 startCountdown = false;
+                if (pipas.size() < 1)
+                {
+                    SpawnPipe(pipas, pipeGap, pipeWidth);
+                    getScore = false;
+                }
             }
 
             // Draw Player
@@ -179,7 +193,8 @@ int main()
             // Draw pipa
             for (auto p : pipas)
             {
-                DrawRectangleRec(p.rect, GREEN);
+                DrawRectangle(p.x, 0, p.width, p.gapY, GREEN);
+                DrawRectangle(p.x, p.gapY + p.gapSize, p.width, HEIGHT - p.gapY + p.gapSize, GREEN);
             }
 
             DrawText(to_string(score).c_str(), WIDTH / 2, 20, 30, WHITE);
